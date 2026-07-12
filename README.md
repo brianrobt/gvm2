@@ -1,12 +1,40 @@
-# gvm
+# gvm2
 
-[![Build Status](https://travis-ci.org/moovweb/gvm.svg?branch=master)](https://travis-ci.org/moovweb/gvm)
+> **Status: under active development — not production ready**
+>
+> gvm2 is a community reboot of the Go Version Manager. APIs, install flows, and
+> shell integration are all being reviewed and may change without notice. Use in
+> production environments at your own risk. Bug reports and contributions are
+> welcome while we stabilize the project.
 
-By Josh Bussdieker (jbuss, jaja, jbussdieker) while working at [Moovweb](https://www.moovweb.com)
+## About this reboot
 
-Currently lovingly maintained by [Benjamin Knigge](https://github.com/BenKnigge)
+[gvm](https://github.com/moovweb/gvm) (Go Version Manager) was created by Josh
+Bussdieker at [Moovweb](https://www.moovweb.com) and later maintained by
+[Benjamin Knigge](https://github.com/BenKnigge). The upstream repository is no
+longer actively maintained — see [moovweb/gvm#536](https://github.com/moovweb/gvm/issues/536).
 
-Pull requests and other any other contributions would be very much appreciated.
+**gvm2** continues that work under a new name so the original project can be
+resumed by its prior maintainers if they choose, without conflicting with this
+effort. This repository is an independent continuation, not affiliated with
+Moovweb.
+
+### Issue triage (from moovweb/gvm)
+
+The upstream repo has ~200 open issues and ~30 open pull requests. Initial
+triage groups the backlog into these priorities:
+
+| Priority | Area | Examples | Status in gvm2 |
+|----------|------|----------|----------------|
+| P0 | Shell integration (`cd`, PATH, zsh) | [#527](https://github.com/moovweb/gvm/issues/527), [#528](https://github.com/moovweb/gvm/issues/528), [#515](https://github.com/moovweb/gvm/issues/515) | Fixes in progress |
+| P1 | Install / bootstrap | [#530](https://github.com/moovweb/gvm/issues/530), [#525](https://github.com/moovweb/gvm/issues/525) | Planned |
+| P2 | UX / docs / ergonomics | [#517](https://github.com/moovweb/gvm/issues/517), [#516](https://github.com/moovweb/gvm/issues/516) | Planned |
+| P3 | Features (progress bars, worktrees, auto-detect `go.mod`) | [#514](https://github.com/moovweb/gvm/issues/514), [#523](https://github.com/moovweb/gvm/issues/523) | Backlog |
+
+If you filed an issue on [moovweb/gvm](https://github.com/moovweb/gvm), please
+re-open it here so we can track it going forward.
+
+Pull requests and other contributions are very much appreciated.
 
 GVM provides an interface to manage Go versions.
 
@@ -39,7 +67,7 @@ To install:
 1.  Install gvm:
 
     ```
-    bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
+    bash < <(curl -s -S -L https://raw.githubusercontent.com/brianrobt/gvm2/master/binscripts/gvm-installer)
     ```
 
 Or if you are using zsh just change `bash` with `zsh`

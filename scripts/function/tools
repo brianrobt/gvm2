@@ -16,3 +16,6 @@ EGREP_PATH=$(unalias egrep &> /dev/null; command -v egrep) || display_error "$EG
 SORT_PATH=$(unalias sort &> /dev/null; command -v sort) || display_error "$SORT_ERROR" || return 1
 HEAD_PATH=$(unalias head &> /dev/null; command -v head) || display_error "$HEAD_ERROR" || return 1
 HEXDUMP_PATH=$(unalias hexdump &> /dev/null; command -v hexdump) || display_error "$HEXDUMP_ERROR" || return 1
+
+# Export so paths survive shells that only persist exported env vars (see #527).
+export LS_PATH TR_PATH SED_PATH GREP_PATH EGREP_PATH SORT_PATH HEAD_PATH HEXDUMP_PATH
