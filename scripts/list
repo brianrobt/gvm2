@@ -1,6 +1,34 @@
 #!/usr/bin/env bash
 . "$GVM_ROOT/scripts/functions"
 
+porcelain=false
+for arg in "$@"; do
+	case "$arg" in
+		--porcelain|-p)
+			porcelain=true
+			;;
+		-h|--help)
+			echo "Usage: gvm list [--porcelain]"
+			exit 0
+			;;
+	esac
+done
+
+if [[ "$porcelain" == true ]]; then
+	if [[ -d $GVM_ROOT/gos ]]; then
+		for go_dir in "$GVM_ROOT/gos"/*; do
+			[[ -d "$go_dir" ]] || continue
+			go_name=$(basename "$go_dir")
+			if [[ "$gvm_go_name" == "$go_name" ]]; then
+				printf '=> %s\n' "$go_name"
+			else
+				printf '   %s\n' "$go_name"
+			fi
+		done
+	fi
+	exit 0
+fi
+
 echo
 display_message "gvm gos (installed)"
 echo
@@ -12,4 +40,3 @@ if [[ -d $GVM_ROOT/gos ]]; then
 	fi
 fi
 echo
-

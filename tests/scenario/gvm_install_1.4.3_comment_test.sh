@@ -1,1 +1,1 @@
-gvm install go1.4.3 #status=0
+gvm install go1.22.12 -B #status=0

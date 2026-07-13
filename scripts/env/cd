@@ -2,10 +2,27 @@
 
 # Override the cd() function to implement auto-switching of go version and
 # pkgset when changing into a directory.
+#
+# Set GVM_NO_CD=1 before sourcing gvm to skip this hook entirely.
 
 . "$GVM_ROOT/scripts/functions" || return 1
 . "$GVM_ROOT/scripts/function/_bash_pseudo_hash" || return 1
 . "$GVM_ROOT/scripts/function/_shell_compat" || return 1
+
+# Path cleanup — always run, even when GVM_NO_CD disables the cd() hook.
+#
+# Sort all paths, place rvm paths first, followed by gvm, followed by the rest.
+# We do this so that rvm and gvm can live together happily.
+#
+# NOTE: Cleanup will also take place everytime 'gvm use' or 'gvm pkgset use' is
+# executed but we do it now just to call it from some place on login.
+#
+export PATH="$(__gvm_munge_path)"
+
+# Optional escape hatch for slow shells / autofs (moovweb/gvm#479, #485).
+if [[ "${GVM_NO_CD}" == "1" ]]; then
+    return 0
+fi
 
 # user could be reloading this file, restore preserved functions if we've been
 # through here already.
@@ -16,24 +33,17 @@ if __gvm_is_function __gvm_oldcd; then
     unset -f __gvm_oldcd
 fi
 
+# Locale-safe: prefer type -t / whence over translated "cd is a shell builtin".
 if __gvm_is_function cd; then
     eval "$(echo "__gvm_oldcd()"; declare -f cd | sed '1 s/{/\'$'\n''{/' | tail -n +2)"
-elif [[ "$(builtin type cd)" == "cd is a shell builtin" ]]; then
+elif [[ -n $BASH_VERSION ]] && [[ "$(type -t cd 2>/dev/null)" == "builtin" ]]; then
+    eval "$(echo "__gvm_oldcd() { builtin cd \"\$@\"; return \$?; }")"
+elif [[ -n $ZSH_VERSION ]] && [[ "$(whence -w cd 2>/dev/null)" == "cd: builtin" ]]; then
     eval "$(echo "__gvm_oldcd() { builtin cd \"\$@\"; return \$?; }")"
 else
-    # cd is aliased (e.g. by oh-my-bash) — fall back to builtin cd
+    # cd is aliased (e.g. by oh-my-bash) or unknown — fall back to builtin cd
     eval "$(echo "__gvm_oldcd() { builtin cd \"\$@\"; return \$?; }")"
 fi
-
-# Path cleanup
-#
-# Sort all paths, place rvm paths first, followed by gvm, followed by the rest.
-# We do this so that rvm and gvm can live together happily.
-#
-# NOTE: Cleanup will also take place everytime 'gvm use' or 'gvm pkgset use' is
-# executed but we do it now just to call it from some place on login.
-#
-export PATH="$(__gvm_munge_path)"
 
 # cd()
 # /*!
@@ -47,9 +57,18 @@ export PATH="$(__gvm_munge_path)"
 # */
 
 cd() {
-    # @FIXME: gvm_oldcd is broken on re-sourcing .bashrc!
+    local cd_status=0
     if __gvm_is_function __gvm_oldcd; then
         __gvm_oldcd "$@"
+        cd_status=$?
+    else
+        builtin cd "$@"
+        cd_status=$?
+    fi
+
+    # Failed directory change must not run gvm switch logic.
+    if [[ $cd_status -ne 0 ]]; then
+        return $cd_status
     fi
 
     local dot_go_version dot_go_pkgset rslt
@@ -125,8 +144,7 @@ cd() {
         unset use_goversion
     elif [[ -n "${defaults_go_name}" ]]; then
         [[ "${GVM_DEBUG}" -eq 1 ]] && echo "No .go-version found. Using system or default go."
-        # gvm use --quiet "${defaults_go_name}" || return 1
-        # gvm use "${defaults_go_name}" || return 1
+        gvm use --quiet "${defaults_go_name}" || true
     else
         # quietly failing
         if [[ "${GVM_DEBUG}" -eq 1 ]]; then
@@ -154,7 +172,7 @@ cd() {
     elif [[ -n "${defaults_go_pkgset}" ]];then
         [[ "${GVM_DEBUG}" -eq 1 ]] && echo "No .go-pkgset found. Using system or default pkgset."
         [[ "${GVM_DEBUG}" -eq 1 ]] && echo "----------    defaults_go_pkgset => $defaults_go_pkgset     ----------"
-        # gvm pkgset use --quiet "${defaults_go_pkgset}" || return 1
+        gvm pkgset use --quiet "${defaults_go_pkgset}" || true
     else
         # quietly failing
         [[ "${GVM_DEBUG}" -eq 1 ]] && echo "No fallback pkgset could be found."

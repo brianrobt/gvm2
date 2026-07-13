@@ -1,11 +1,11 @@
 # gvm2
 
-> **Status: under active development — not production ready**
+> **Status: stable for daily use (v1.1.0)**
 >
-> gvm2 is a community reboot of the Go Version Manager. APIs, install flows, and
-> shell integration are all being reviewed and may change without notice. Use in
-> production environments at your own risk. Bug reports and contributions are
-> welcome while we stabilize the project.
+> gvm2 is a community reboot of the Go Version Manager. Please file bugs and
+> contributions against this repository. Production use is supported for the
+> install and shell-integration paths covered by CI; advanced pkgset workflows
+> may still have rough edges.
 
 ## About this reboot
 
@@ -19,6 +19,9 @@ resumed by its prior maintainers if they choose, without conflicting with this
 effort. This repository is an independent continuation, not affiliated with
 Moovweb.
 
+The CLI command remains `gvm` and the default install directory remains
+`~/.gvm` for drop-in compatibility with existing setups.
+
 ### Issue triage (from moovweb/gvm)
 
 The upstream repo has ~200 open issues and ~30 open pull requests. Initial
@@ -26,13 +29,12 @@ triage groups the backlog into these priorities:
 
 | Priority | Area | Examples | Status in gvm2 |
 |----------|------|----------|----------------|
-| P0 | Shell integration (`cd`, PATH, zsh) | [#527](https://github.com/moovweb/gvm/issues/527), [#528](https://github.com/moovweb/gvm/issues/528), [#515](https://github.com/moovweb/gvm/issues/515) | Fixes in progress |
-| P1 | Install / bootstrap | [#530](https://github.com/moovweb/gvm/issues/530), [#525](https://github.com/moovweb/gvm/issues/525) | Planned |
+| P0 | Shell integration (`cd`, PATH, zsh) | [#527](https://github.com/moovweb/gvm/issues/527), [#528](https://github.com/moovweb/gvm/issues/528), [#515](https://github.com/moovweb/gvm/issues/515) | Fixed in 1.1.0 |
+| P1 | Install / bootstrap | [#530](https://github.com/moovweb/gvm/issues/530), [#480](https://github.com/moovweb/gvm/issues/480) | Fixed in 1.1.0 |
 | P2 | UX / docs / ergonomics | [#517](https://github.com/moovweb/gvm/issues/517), [#516](https://github.com/moovweb/gvm/issues/516) | Planned |
 | P3 | Features (progress bars, worktrees, auto-detect `go.mod`) | [#514](https://github.com/moovweb/gvm/issues/514), [#523](https://github.com/moovweb/gvm/issues/523) | Backlog |
 
-If you filed an issue on [moovweb/gvm](https://github.com/moovweb/gvm), please
-re-open it here so we can track it going forward.
+Tracked here: [brianrobt/gvm2/issues](https://github.com/brianrobt/gvm2/issues).
 
 Pull requests and other contributions are very much appreciated.
 
@@ -40,12 +42,13 @@ GVM provides an interface to manage Go versions.
 
 Features
 ========
-* Install/Uninstall Go versions with `gvm install [tag]` where tag is "60.3", "go1", "weekly.2011-11-08", or "tip"
+* Install/Uninstall Go versions with `gvm install [tag]` where tag is "go1.22.12", "go1", "weekly.2011-11-08", or "tip"
 * List added/removed files in GOROOT with `gvm diff`
 * Manage GOPATHs with `gvm pkgset [create/use/delete] [name]`. Use `--local` as `name` to manage repository under local path (`/path/to/repo/.gvm_local`).
 * List latest release tags with `gvm listall`. Use `--all` to list weekly as well.
 * Cache a clean copy of the latest Go source for multiple version installs.
 * Link project directories into GOPATH
+* Optional `GVM_NO_CD=1` to disable the `cd` auto-switch hook
 
 Background
 ==========
@@ -58,13 +61,13 @@ Installing
 
 To install:
 
-1.  Install [Bison](https://www.gnu.org/software/bison/):
+1.  Install [Bison](https://www.gnu.org/software/bison/) (needed for source builds):
 
     ```
     sudo apt-get install bison
     ```
 
-1.  Install gvm:
+1.  Install gvm2:
 
     ```
     bash < <(curl -s -S -L https://raw.githubusercontent.com/brianrobt/gvm2/master/binscripts/gvm-installer)
@@ -74,8 +77,15 @@ Or if you are using zsh just change `bash` with `zsh`
 
 Installing Go
 =============
-    gvm install go1.4
-    gvm use go1.4 [--default]
+
+On a machine with no Go installed, prefer a binary install (default when no
+`go` is on `PATH`):
+
+```
+gvm install go1.22.12
+gvm use go1.22.12 [--default]
+```
+
 Once this is done Go will be in the path and ready to use. $GOROOT and $GOPATH are set automatically.
 
 Additional options can be specified when installing Go:
@@ -88,44 +98,20 @@ Additional options can be specified when installing Go:
         -B,  --binary             Only install from binary.
              --prefer-binary      Attempt a binary install, falling back to source.
         -h,  --help               Display this message.
-        
-### A Note on Compiling Go 1.5+
-Go 1.5+ removed the C compilers from the toolchain and [replaced][compiler_note] them with one written in Go. Obviously, this creates a bootstrapping problem if you don't already have a working Go install. In order to compile Go 1.5+, make sure Go 1.4 is installed first. If Go 1.4 won't install try a later version (e.g. go1.5), just make sure you have the `-B` option after the version number. 
 
-```
-gvm install go1.4 -B
-gvm use go1.4
-export GOROOT_BOOTSTRAP=$GOROOT
-gvm install go1.7
-```
+### Compiling from source (Go 1.5+)
+
+Go 1.5+ removed the C compilers from the toolchain and [replaced][compiler_note]
+them with one written in Go. gvm2 handles this automatically: when a source
+install needs a bootstrap compiler, it finds a compatible installed version or
+downloads a binary bootstrap for you. You do not need a pre-existing Go install
+or a manual go1.4 chain.
 
 ### A Note on ARMv6 and ARMv7 architectures (32 bit)
-Binary versions for ARMv6 architecture are available [starting from Go 1.6](https://go.dev/dl/#go1.6). So, it is necessary to bootstrap with an existing binary version, then it will be possible compiling other versions. For instance, to bootstrap a setup, version `1.21.0` may be used:
 
-```
-gvm install go1.21.0 -B
-gvm use go1.21.0
-```
-
-And then, compile any other version:
-
-```
-gvm install go1.20.7
-```
-
-#### To install Go 1.20+
-Go 1.20+ requires go1.17.3+. Use the below:
-
-```
-gvm install go1.4 -B
-gvm use go1.4
-export GOROOT_BOOTSTRAP=$GOROOT
-gvm install go1.17.13
-gvm use go1.17.13
-export GOROOT_BOOTSTRAP=$GOROOT
-gvm install go1.20
-gvm use go1.20
-```
+Binary versions for ARMv6 architecture are available
+[starting from Go 1.6](https://go.dev/dl/#go1.6). gvm2 will pull a compatible
+binary to bootstrap source installations on ARM as well when needed.
 
 [compiler_note]: https://docs.google.com/document/d/1OaatvGhEAq7VseQ9kkavxKNAfepWy2yhPUBs96FGV28/edit
 
@@ -149,13 +135,10 @@ If that doesn't work see the troubleshooting steps at the bottom of this page.
 
 Mac OS X Requirements
 ====================
- * Install Mercurial from https://www.mercurial-scm.org/downloads
  * Install Xcode Command Line Tools from the App Store.
 
 ```
 xcode-select --install
-brew update
-brew install mercurial
 ```
 
 Linux Requirements
@@ -163,7 +146,7 @@ Linux Requirements
 
 Debian/Ubuntu
 ==================
-    sudo apt-get install curl git mercurial make binutils bison gcc build-essential
+    sudo apt-get install curl git make binutils bison gcc build-essential
 
 Redhat/Centos
 ==================
@@ -175,14 +158,11 @@ Redhat/Centos
     sudo yum install gcc
     sudo yum install glibc-devel
 
- * Install Mercurial from http://pkgs.repoforge.org/mercurial/
-
 FreeBSD Requirements
 ====================
 
     sudo pkg_add -r bash
     sudo pkg_add -r git
-    sudo pkg_add -r mercurial
 
 Vendoring Native Code and Dependencies
 ==================================================
@@ -217,7 +197,7 @@ system provides:
 
 Recipe for success:
 
-    gvm use go1.1
+    gvm use go1.22.12
     gvm pkgset use current-known-good
     # Let's assume that this includes some C headers and native libraries, which
     # Go's CGO facility wraps for us.  Let's assume that these native
@@ -233,6 +213,6 @@ See examples/native for a working example.
 
 Troubleshooting
 ===============
-Sometimes especially during upgrades the state of gvm's files can get mixed up. This is mostly true for upgrade from older version than 0.0.8. Changes are slowing down and a LTR is imminent. But for now `rm -rf ~/.gvm` will always remove gvm. Stay tuned!
-
-[![Gitter](https://badges.gitter.im/GoVesionManager/community.svg)](https://gitter.im/GoVesionManager/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+If gvm's state gets mixed up, `rm -rf ~/.gvm` removes it completely. Set
+`GVM_NO_CD=1` before sourcing gvm if the `cd` hook conflicts with autofs or is
+too slow for your environment.

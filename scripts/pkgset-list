@@ -1,6 +1,45 @@
 #!/usr/bin/env bash
 . "$GVM_ROOT/scripts/functions"
 
+porcelain=false
+for arg in "$@"; do
+	case "$arg" in
+		--porcelain|-p)
+			porcelain=true
+			;;
+		-h|--help)
+			echo "Usage: gvm pkgset list [--porcelain]"
+			exit 0
+			;;
+	esac
+done
+
+if [[ "$porcelain" == true ]]; then
+	if [[ -n "$gvm_go_name" ]]; then
+		printf 'G  %s\n' "$gvm_go_name"
+	fi
+	if [[ -d $GVM_ROOT/pkgsets/$gvm_go_name ]]; then
+		pkgset_local=$(find_local_pkgset)
+		if [[ -d $pkgset_local ]]; then
+			if [[ "$gvm_pkgset_name" == "__local__" ]]; then
+				printf '=>L %s\n' "$pkgset_local"
+			else
+				printf '  L %s\n' "$pkgset_local"
+			fi
+		fi
+		for cur_dir in "$GVM_ROOT/pkgsets/$gvm_go_name"/*; do
+			[[ -d "$cur_dir" ]] || continue
+			pkgset=$(basename "$cur_dir")
+			if [[ "$gvm_pkgset_name" == "$pkgset" ]]; then
+				printf '=>  %s\n' "$pkgset"
+			else
+				printf '    %s\n' "$pkgset"
+			fi
+		done
+	fi
+	exit 0
+fi
+
 echo
 display_message "gvm go package sets ($gvm_go_name)"
 echo
@@ -26,4 +65,3 @@ if [[ -d $GVM_ROOT/pkgsets/$gvm_go_name ]]; then
 	done
 fi
 echo
-

@@ -286,10 +286,19 @@ _encode() {
                 new_string+="$__char"
                 ;;
             *)
-                hex="$(echo -n "$__char" | $HEXDUMP_PATH -e '1 1 "!%02x"')"
-                new_string+="${hex//!/%}"
-                ;;
-        esac
+                # Resolve hexdump if lost (agent shells that keep functions but not exports).
+                if [[ -z "${HEXDUMP_PATH}" ]]; then
+                    HEXDUMP_PATH="$(command -v hexdump 2>/dev/null)"
+                    export HEXDUMP_PATH
+                fi
+                if [[ -n "${HEXDUMP_PATH}" ]]; then
+                    hex="$(echo -n "$__char" | "$HEXDUMP_PATH" -e '1 1 "!%02x"')"
+                    new_string+="${hex//!/%}"
+                else
+                    # Last resort without hexdump (printf '%02x' "'c")
+                    new_string+="%$(printf '%02x' "'${__char}")"
+                fi
+                ;;        esac
     done
     unset i _string_len
 

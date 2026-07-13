@@ -1,7 +1,8 @@
 It doesn't look like Go has been installed. Follow these steps to begin:
 
        1) Use 'gvm listall' to select a go version
-       2) Use 'gvm install <version>' to install.**
+       2) Use 'gvm install <version>' (binary preferred on a fresh machine)
        3) Then use 'cd .' or 'gvm use <version>'.
 
-**You will need to install go1.4 or earlier to build later versions.
+Example: gvm install go1.22.12
+(Source builds auto-bootstrap a binary compiler when needed.)
