@@ -5,7 +5,7 @@
 > gvm2 is a community reboot of the Go Version Manager. Please file bugs and
 > contributions against this repository. Production use is supported for the
 > install and shell-integration paths covered by CI; advanced pkgset workflows
-> may still have rough edges.
+> may still be ustable.
 
 ## About this reboot
 
