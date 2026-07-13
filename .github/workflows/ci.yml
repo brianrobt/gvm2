@@ -43,28 +43,34 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/gvm-dest"
           ./binscripts/gvm-installer "${{ github.sha }}" "$RUNNER_TEMP/gvm-dest"
-        shell: bash
 
       - name: Run comment tests
+        env:
+          GVM_SHELL: ${{ matrix.shell }}
         run: |
-          source "$RUNNER_TEMP/gvm-dest/gvm/scripts/gvm"
-          tf --text "$RUNNER_TEMP/gvm-dest/gvm/tests/"*.sh
-        shell: ${{ matrix.shell }} -e {0}
+          $GVM_SHELL -c '
+            set -e
+            source "'"$RUNNER_TEMP"'/gvm-dest/gvm/scripts/gvm"
+            tf --text "'"$RUNNER_TEMP"'/gvm-dest/gvm/tests/"*.sh
+          '
 
       - name: Smoke — binary install, use, cd with spaces
+        env:
+          GVM_SHELL: ${{ matrix.shell }}
         run: |
-          source "$RUNNER_TEMP/gvm-dest/gvm/scripts/gvm"
-          gvm install go1.22.12 -B
-          gvm use go1.22.12
-          go version | grep -E 'go1\.22\.12'
-          spaced="$RUNNER_TEMP/dir with spaces"
-          mkdir -p "$spaced"
-          cd "$spaced"
-          pwd | grep 'dir with spaces'
-          # HEXDUMP_PATH must remain usable after export
-          test -n "$HEXDUMP_PATH"
-          command -v "$HEXDUMP_PATH"
-        shell: ${{ matrix.shell }} -e {0}
+          $GVM_SHELL -c '
+            set -e
+            source "'"$RUNNER_TEMP"'/gvm-dest/gvm/scripts/gvm"
+            gvm install go1.22.12 -B
+            gvm use go1.22.12
+            go version | grep -E "go1\\.22\\.12"
+            spaced="'"$RUNNER_TEMP"'/dir with spaces"
+            mkdir -p "$spaced"
+            cd "$spaced"
+            pwd | grep "dir with spaces"
+            test -n "$HEXDUMP_PATH"
+            command -v "$HEXDUMP_PATH"
+          '
 
   scenario:
     name: scenario / ${{ matrix.os }}
@@ -91,4 +97,3 @@ jobs:
 
       - name: Run scenario tests
         run: rake scenario
-        shell: bash
