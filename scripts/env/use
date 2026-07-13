@@ -190,7 +190,7 @@ gvm_use() {
         unset _item
     fi
 
-    local version="$(valueForKeyFakeAssocArray "--version" "${options_hash[*]}")"
+    local version="$(valueForKeyFakeAssocArray "--version" "${options_hash[*]}" || true)"
 
     if [[ -z "${version}" ]]
     then
@@ -198,17 +198,33 @@ gvm_use() {
         return 1
     fi
 
-    fuzzy_match=$($LS_PATH -1 "$GVM_ROOT/gos" | $SORT_PATH | $GREP_PATH "$version" | $HEAD_PATH -n 1 | $GREP_PATH "${version}")
+    # Exact match first, then prefix match — avoid fragile multi-grep pipelines under `set -e`.
+    fuzzy_match=""
+    if [[ -d "$GVM_ROOT/gos/$version" ]]; then
+        fuzzy_match="$version"
+    elif [[ -d "$GVM_ROOT/gos" ]]; then
+        local _cand
+        while IFS= read -r _cand; do
+            [[ -z "$_cand" ]] && continue
+            if [[ "$_cand" == "$version"* ]]; then
+                fuzzy_match="$_cand"
+                break
+            fi
+        done <<< "$($LS_PATH -1 "$GVM_ROOT/gos" 2>/dev/null | $SORT_PATH 2>/dev/null || true)"
+        unset _cand
+    fi
     if [[ -z "${fuzzy_match}" ]]; then
         local go_archive_path="$GVM_ROOT/archive/go"
         if [[ ! -d "${go_archive_path}" ]];then
             display_error "$(locale_text_for_key "go_install_prompt")"
             return 1
         fi
-        if [[ -z "$(builtin cd "${go_archive_path}" && git tag -l "${version}")" ]]; then
-            display_error "Version not found locally. Try 'gvm install ${version}'" || return 1
+        if [[ -z "$(builtin cd "${go_archive_path}" && git tag -l "${version}" || true)" ]]; then
+            display_error "Version not found locally. Try 'gvm install ${version}'"
+            return 1
         else
-            display_warning "${version} is not installed. Install it by running 'gvm install ${version}'" || return 1
+            display_warning "${version} is not installed. Install it by running 'gvm install ${version}'"
+            return 1
         fi
         unset go_archive_path
     fi

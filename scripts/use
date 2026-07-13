@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Allow `bin/gvm use` (non-interactive / tf) the same as the shell function path.
+. "$GVM_ROOT/scripts/env/use" || exit 1
+gvm_use "$@"
