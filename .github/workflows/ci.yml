@@ -37,28 +37,31 @@ jobs:
           test -f "$RUNNER_TEMP/gvm-dest/gvm/VERSION"
           grep -q '1.1.0' "$RUNNER_TEMP/gvm-dest/gvm/VERSION"
 
-      - name: Smoke script
+      - name: Smoke
+        env:
+          GVM_DEST: ${{ runner.temp }}/gvm-dest
         run: |
-          cat > "$RUNNER_TEMP/smoke.sh" <<'SMOKE'
-          set -e
-          source "$GVM_DEST/gvm/scripts/gvm"
-          echo "GVM_VERSION=$GVM_VERSION HEXDUMP_PATH=$HEXDUMP_PATH"
-          test -n "$HEXDUMP_PATH"
-          gvm install go1.22.12 -B
-          gvm use go1.22.12
-          go version | grep -E 'go1\.22\.12'
-          gvm list --porcelain | grep -F 'go1.22.12'
-          spaced="$GVM_DEST/dir with spaces"
-          mkdir -p "$spaced"
-          cd "$spaced"
-          pwd | grep 'dir with spaces'
-          echo SMOKE_OK
-          SMOKE
-          export GVM_DEST="$RUNNER_TEMP/gvm-dest"
-          case "${{ matrix.shell }}" in
-            bash) bash "$RUNNER_TEMP/smoke.sh" ;;
-            zsh)  zsh "$RUNNER_TEMP/smoke.sh" ;;
-          esac
+          SMOKE_SH="$RUNNER_TEMP/smoke.sh"
+          printf '%s\n' \
+            'set -e' \
+            'source "$GVM_DEST/gvm/scripts/gvm"' \
+            'echo "GVM_VERSION=$GVM_VERSION HEXDUMP_PATH=$HEXDUMP_PATH"' \
+            'test -n "$HEXDUMP_PATH"' \
+            'gvm install go1.22.12 -B' \
+            'gvm use go1.22.12' \
+            'go version | grep -E "go1\\.22\\.12"' \
+            'gvm list --porcelain | grep -F "go1.22.12"' \
+            'spaced="$GVM_DEST/dir with spaces"' \
+            'mkdir -p "$spaced"' \
+            'cd "$spaced"' \
+            'pwd | grep "dir with spaces"' \
+            'echo SMOKE_OK' \
+            > "$SMOKE_SH"
+          if [ "${{ matrix.shell }}" = "zsh" ]; then
+            zsh "$SMOKE_SH"
+          else
+            bash "$SMOKE_SH"
+          fi
 
   suite:
     name: suite / ${{ matrix.os }}
@@ -79,19 +82,22 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y bison curl git make binutils gcc build-essential
 
       - name: Install Ruby gems
+        id: gems
         run: |
           gem install tf -v '>=0.4.1' --user-install
-          GEM_BIN="$(ruby -e 'print Gem.user_dir')/bin"
+          GEM_BIN="$(ruby -r rubygems -e 'print Gem.user_dir')/bin"
+          echo "bin=$GEM_BIN" >> "$GITHUB_OUTPUT"
           echo "$GEM_BIN" >> "$GITHUB_PATH"
-          echo "GEM_BIN=$GEM_BIN" >> "$GITHUB_ENV"
-          "$GEM_BIN/tf" --help >/dev/null
+          export PATH="$GEM_BIN:$PATH"
+          command -v tf
+          tf --help >/dev/null || true
 
       - name: Run rake default
         run: |
-          export PATH="${GEM_BIN}:$PATH"
+          export PATH="${{ steps.gems.outputs.bin }}:$PATH"
           rake default
 
       - name: Run rake scenario
         run: |
-          export PATH="${GEM_BIN}:$PATH"
+          export PATH="${{ steps.gems.outputs.bin }}:$PATH"
           rake scenario
