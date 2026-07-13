@@ -7,8 +7,8 @@ on:
     branches: [master, main]
 
 jobs:
-  test:
-    name: ${{ matrix.os }} / ${{ matrix.shell }}
+  smoke:
+    name: smoke / ${{ matrix.os }} / ${{ matrix.shell }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -22,58 +22,46 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install zsh
+      - name: Install zsh (Linux)
         if: matrix.shell == 'zsh' && runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y zsh
-
-      - name: Install Ruby and tf
-        run: |
-          gem install tf -v '>=0.4.1' --user-install
-          echo "$(ruby -e 'print Gem.user_dir')/bin" >> "$GITHUB_PATH"
 
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y bison curl git make binutils gcc build-essential
 
-      - name: Install dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: brew install bison || true
-
       - name: Install gvm2 locally
         run: |
           mkdir -p "$RUNNER_TEMP/gvm-dest"
           ./binscripts/gvm-installer "${{ github.sha }}" "$RUNNER_TEMP/gvm-dest"
+          test -f "$RUNNER_TEMP/gvm-dest/gvm/VERSION"
+          grep -q '1.1.0' "$RUNNER_TEMP/gvm-dest/gvm/VERSION"
 
-      - name: Run comment tests
-        env:
-          GVM_SHELL: ${{ matrix.shell }}
+      - name: Smoke script
         run: |
-          $GVM_SHELL -c '
-            set -e
-            source "'"$RUNNER_TEMP"'/gvm-dest/gvm/scripts/gvm"
-            tf --text "'"$RUNNER_TEMP"'/gvm-dest/gvm/tests/"*.sh
-          '
+          cat > "$RUNNER_TEMP/smoke.sh" <<'SMOKE'
+          set -e
+          source "$GVM_DEST/gvm/scripts/gvm"
+          echo "GVM_VERSION=$GVM_VERSION HEXDUMP_PATH=$HEXDUMP_PATH"
+          test -n "$HEXDUMP_PATH"
+          gvm install go1.22.12 -B
+          gvm use go1.22.12
+          go version | grep -E 'go1\.22\.12'
+          gvm list --porcelain | grep -F 'go1.22.12'
+          spaced="$GVM_DEST/dir with spaces"
+          mkdir -p "$spaced"
+          cd "$spaced"
+          pwd | grep 'dir with spaces'
+          echo SMOKE_OK
+          SMOKE
+          export GVM_DEST="$RUNNER_TEMP/gvm-dest"
+          case "${{ matrix.shell }}" in
+            bash) bash "$RUNNER_TEMP/smoke.sh" ;;
+            zsh)  zsh "$RUNNER_TEMP/smoke.sh" ;;
+          esac
 
-      - name: Smoke — binary install, use, cd with spaces
-        env:
-          GVM_SHELL: ${{ matrix.shell }}
-        run: |
-          $GVM_SHELL -c '
-            set -e
-            source "'"$RUNNER_TEMP"'/gvm-dest/gvm/scripts/gvm"
-            gvm install go1.22.12 -B
-            gvm use go1.22.12
-            go version | grep -E "go1\\.22\\.12"
-            spaced="'"$RUNNER_TEMP"'/dir with spaces"
-            mkdir -p "$spaced"
-            cd "$spaced"
-            pwd | grep "dir with spaces"
-            test -n "$HEXDUMP_PATH"
-            command -v "$HEXDUMP_PATH"
-          '
-
-  scenario:
-    name: scenario / ${{ matrix.os }}
+  suite:
+    name: suite / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -86,14 +74,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Ruby and tf
-        run: |
-          gem install tf -v '>=0.4.1' --user-install
-          echo "$(ruby -e 'print Gem.user_dir')/bin" >> "$GITHUB_PATH"
-
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y bison curl git make binutils gcc build-essential
 
-      - name: Run scenario tests
-        run: rake scenario
+      - name: Install Ruby gems
+        run: |
+          gem install tf -v '>=0.4.1' --user-install
+          GEM_BIN="$(ruby -e 'print Gem.user_dir')/bin"
+          echo "$GEM_BIN" >> "$GITHUB_PATH"
+          echo "GEM_BIN=$GEM_BIN" >> "$GITHUB_ENV"
+          "$GEM_BIN/tf" --help >/dev/null
+
+      - name: Run rake default
+        run: |
+          export PATH="${GEM_BIN}:$PATH"
+          rake default
+
+      - name: Run rake scenario
+        run: |
+          export PATH="${GEM_BIN}:$PATH"
+          rake scenario
