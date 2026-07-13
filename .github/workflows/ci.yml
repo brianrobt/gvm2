@@ -19,6 +19,7 @@ jobs:
       GVM_NO_GIT_BAK: "1"
       GVM_NO_UPDATE_PROFILE: "1"
       SRC_REPO: ${{ github.workspace }}
+      TERM: xterm
     steps:
       - uses: actions/checkout@v4
 
@@ -31,36 +32,24 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y bison curl git make binutils gcc build-essential
 
       - name: Install gvm2 locally
+        id: install
         run: |
-          mkdir -p "$RUNNER_TEMP/gvm-dest"
-          ./binscripts/gvm-installer "${{ github.sha }}" "$RUNNER_TEMP/gvm-dest"
-          test -f "$RUNNER_TEMP/gvm-dest/gvm/VERSION"
-          grep -q '1.1.0' "$RUNNER_TEMP/gvm-dest/gvm/VERSION"
+          DEST="$RUNNER_TEMP/gvm-dest"
+          mkdir -p "$DEST"
+          ./binscripts/gvm-installer "${{ github.sha }}" "$DEST"
+          test -f "$DEST/gvm/VERSION"
+          grep -q '1.1.0' "$DEST/gvm/VERSION"
+          echo "dest=$DEST" >> "$GITHUB_OUTPUT"
+          ls -la "$DEST/gvm/scripts"
 
       - name: Smoke
-        env:
-          GVM_DEST: ${{ runner.temp }}/gvm-dest
         run: |
-          SMOKE_SH="$RUNNER_TEMP/smoke.sh"
-          printf '%s\n' \
-            'set -e' \
-            'source "$GVM_DEST/gvm/scripts/gvm"' \
-            'echo "GVM_VERSION=$GVM_VERSION HEXDUMP_PATH=$HEXDUMP_PATH"' \
-            'test -n "$HEXDUMP_PATH"' \
-            'gvm install go1.22.12 -B' \
-            'gvm use go1.22.12' \
-            'go version | grep -E "go1\\.22\\.12"' \
-            'gvm list --porcelain | grep -F "go1.22.12"' \
-            'spaced="$GVM_DEST/dir with spaces"' \
-            'mkdir -p "$spaced"' \
-            'cd "$spaced"' \
-            'pwd | grep "dir with spaces"' \
-            'echo SMOKE_OK' \
-            > "$SMOKE_SH"
+          DEST="${{ steps.install.outputs.dest }}"
+          chmod +x scripts/ci-smoke.sh
           if [ "${{ matrix.shell }}" = "zsh" ]; then
-            zsh "$SMOKE_SH"
+            zsh scripts/ci-smoke.sh "$DEST"
           else
-            bash "$SMOKE_SH"
+            bash scripts/ci-smoke.sh "$DEST"
           fi
 
   suite:
@@ -74,6 +63,8 @@ jobs:
       GVM_NO_GIT_BAK: "1"
       GVM_NO_UPDATE_PROFILE: "1"
       SRC_REPO: ${{ github.workspace }}
+      TERM: xterm
+      TRAVIS_COMMIT: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
 
@@ -82,22 +73,14 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y bison curl git make binutils gcc build-essential
 
       - name: Install Ruby gems
-        id: gems
         run: |
           gem install tf -v '>=0.4.1' --user-install
           GEM_BIN="$(ruby -r rubygems -e 'print Gem.user_dir')/bin"
-          echo "bin=$GEM_BIN" >> "$GITHUB_OUTPUT"
           echo "$GEM_BIN" >> "$GITHUB_PATH"
-          export PATH="$GEM_BIN:$PATH"
-          command -v tf
-          tf --help >/dev/null || true
+          echo "PATH=$GEM_BIN:$PATH" >> "$GITHUB_ENV"
 
       - name: Run rake default
-        run: |
-          export PATH="${{ steps.gems.outputs.bin }}:$PATH"
-          rake default
+        run: rake default
 
       - name: Run rake scenario
-        run: |
-          export PATH="${{ steps.gems.outputs.bin }}:$PATH"
-          rake scenario
+        run: rake scenario

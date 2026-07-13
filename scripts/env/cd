@@ -82,14 +82,16 @@ cd() {
 	fi
 
     # gather default environment settings, they can change at any time!
+    # Check file existence before reading so `set -e` callers (CI smoke) are safe —
+    # command substitution of a failing function aborts under errexit.
     [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Resolving defaults..."
-    defaults_hash=( $(__gvm_read_environment_file "${GVM_ROOT}/environments/default") )
-    if [[ $? -eq 0 ]]; then
+    if [[ -f "${GVM_ROOT}/environments/default" ]]; then
+        defaults_hash=( $(__gvm_read_environment_file "${GVM_ROOT}/environments/default") )
         defaults_resolved=true
     else
         [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Can't find default environment. Falling back to system."
-        defaults_hash=( $(__gvm_read_environment_file "${GVM_ROOT}/environments/system") )
-        if [[ $? -eq 0 ]]; then
+        if [[ -f "${GVM_ROOT}/environments/system" ]]; then
+            defaults_hash=( $(__gvm_read_environment_file "${GVM_ROOT}/environments/system") )
             defaults_resolved=true
         else
             [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Can't find system environment."
@@ -98,9 +100,9 @@ cd() {
 
     if [[ "${defaults_resolved}" == false ]]; then
         [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Resolving fallback go version and pkgset from all available."
-        local fallback_go_version="$(__gvm_resolve_fallback_version)"
-        local fallback_go_pkgset="$(__gvm_resolve_fallback_pkgset "${fallback_go_version}")"
-
+        # Guard with `|| true` so missing fallbacks do not abort under `set -e`.
+        local fallback_go_version="$(__gvm_resolve_fallback_version || true)"
+        local fallback_go_pkgset="$(__gvm_resolve_fallback_pkgset "${fallback_go_version}" || true)"
 
         [[ "${GVM_DEBUG}" -eq 1 ]] && echo "======================================="
         [[ "${GVM_DEBUG}" -eq 1 ]] && echo "fallback_go_version => $fallback_go_version"
@@ -114,9 +116,8 @@ cd() {
         defaults_resolved=true
     fi
 
-    defaults_go_name="$(valueForKeyFakeAssocArray "gvm_go_name" "${defaults_hash[*]}")"
-    defaults_go_pkgset="$(valueForKeyFakeAssocArray "gvm_pkgset_name" "${defaults_hash[*]}")"
-
+    defaults_go_name="$(valueForKeyFakeAssocArray "gvm_go_name" "${defaults_hash[*]}" || true)"
+    defaults_go_pkgset="$(valueForKeyFakeAssocArray "gvm_pkgset_name" "${defaults_hash[*]}" || true)"
 
     [[ "${GVM_DEBUG}" -eq 1 ]] && echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
     [[ "${GVM_DEBUG}" -eq 1 ]] && echo "defaults_go_name => $defaults_go_name"
@@ -128,8 +129,13 @@ cd() {
         echo "Resolved default pkgset: ${defaults_go_pkgset:-[EMPTY]}"
     fi
 
-    dot_go_version="$(__gvmp_find_closest_dot_go_version)"
-    rslt=$?
+    # `if` form is set -e safe when find returns status 1 (not found).
+    if dot_go_version="$(__gvmp_find_closest_dot_go_version)"; then
+        rslt=0
+    else
+        rslt=1
+        dot_go_version=""
+    fi
 
     [[ "${GVM_DEBUG}" -eq 1 ]] && echo "---------------------------------------"
     [[ "${GVM_DEBUG}" -eq 1 ]] && echo "dot_go_version => $dot_go_version"
@@ -138,9 +144,10 @@ cd() {
 
     if [[ $rslt -eq 0 ]]; then
         [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Found dot_go_version: ${dot_go_version}"
-        local use_goversion="$(__gvmp_read_dot_go_version "${dot_go_version}")"
+        local use_goversion
+        use_goversion="$(__gvmp_read_dot_go_version "${dot_go_version}" || true)"
         [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Switching to: ${use_goversion}"
-        gvm use "${use_goversion}" || return 1
+        [[ -n "${use_goversion}" ]] && { gvm use "${use_goversion}" || return 1; }
         unset use_goversion
     elif [[ -n "${defaults_go_name}" ]]; then
         [[ "${GVM_DEBUG}" -eq 1 ]] && echo "No .go-version found. Using system or default go."
@@ -158,16 +165,21 @@ cd() {
         return 0
     fi
 
-    dot_go_pkgset="$(__gvmp_find_closest_dot_go_pkgset)"
-    rslt=$?
+    if dot_go_pkgset="$(__gvmp_find_closest_dot_go_pkgset)"; then
+        rslt=0
+    else
+        rslt=1
+        dot_go_pkgset=""
+    fi
     [[ "${GVM_DEBUG}" -eq 1 ]] && echo "--------------------------------"
     [[ "${GVM_DEBUG}" -eq 1 ]] && echo "dot_go_pkgset => $dot_go_pkgset"
     [[ "${GVM_DEBUG}" -eq 1 ]] && echo "--------------------------------"
     if [[ $rslt -eq 0 ]]; then
         [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Found .go-pkgset: ${dot_go_pkgset}"
-        local use_gopkgset="$(__gvmp_read_dot_go_pkgset "${dot_go_pkgset}")"
+        local use_gopkgset
+        use_gopkgset="$(__gvmp_read_dot_go_pkgset "${dot_go_pkgset}" || true)"
         [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Switching to: ${use_gopkgset}"
-        gvm pkgset use "${use_gopkgset}" || return 1
+        [[ -n "${use_gopkgset}" ]] && { gvm pkgset use "${use_gopkgset}" || return 1; }
         unset use_gopkgset
     elif [[ -n "${defaults_go_pkgset}" ]];then
         [[ "${GVM_DEBUG}" -eq 1 ]] && echo "No .go-pkgset found. Using system or default pkgset."
@@ -182,21 +194,25 @@ cd() {
 }
 
 __gvmp_find_closest_dot_go_version() {
-    local resp rslt
+    local resp=""
 
-    resp="$(__gvm_find_path_upwards ".go-version")"
-    rslt=$?
-
-    echo "${resp}"; return $rslt
+    if resp="$(__gvm_find_path_upwards ".go-version")"; then
+        echo "${resp}"
+        return 0
+    fi
+    echo ""
+    return 1
 }
 
 __gvmp_find_closest_dot_go_pkgset() {
-    local resp rslt
+    local resp=""
 
-    resp="$(__gvm_find_path_upwards ".go-pkgset")"
-    rslt=$?
-
-    echo "${resp}"; return $rslt
+    if resp="$(__gvm_find_path_upwards ".go-pkgset")"; then
+        echo "${resp}"
+        return 0
+    fi
+    echo ""
+    return 1
 }
 
 __gvmp_read_dot_go_version() {
