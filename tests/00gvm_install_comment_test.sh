@@ -1,3 +1,5 @@
+source $GVM_ROOT/scripts/gvm
+
 ## Cleanup test objects
 gvm uninstall go1.22.12 > /dev/null 2>&1
 gvm uninstall go1.21.13 > /dev/null 2>&1
