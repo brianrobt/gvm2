@@ -5,6 +5,23 @@ All notable changes to gvm2 are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-07-14
+
+### Added
+
+- `gvm listall` annotations for `latest` / `beta` / `rc` (moovweb/gvm#516).
+- `gvm listall --latest` and `--porcelain` for nvm-style / script workflows.
+- README quick-start and command table aimed at easier onboarding (moovweb/gvm#517).
+
+### Fixed
+
+- README status banner typo ("ustable" → restore "rough edges" wording).
+
+### Changed
+
+- Fresh-install locale prompt mentions `gvm listall --latest`.
+- Remove `AGENTS.md` from the repo (agent guidance belongs in Cursor User Rules, not GitHub).
+
 ## [1.1.0] - 2026-07-13
 
 ### Added
@@ -14,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `gvm list --porcelain` and `gvm pkgset list --porcelain` for machine-readable output.
 - `GVM_NO_CD=1` to disable the `cd` auto-switch hook.
 - GitHub Actions CI (Ubuntu/macOS, bash/zsh smoke).
-- Project `AGENTS.md` and issue triage labels (`p0-shell`, `p1-bootstrap`, …).
+- Issue triage labels (`p0-shell`, `p1-bootstrap`, …).
 
 ### Fixed
 
