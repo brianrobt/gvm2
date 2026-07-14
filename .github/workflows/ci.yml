@@ -38,7 +38,7 @@ jobs:
           mkdir -p "$DEST"
           ./binscripts/gvm-installer "${{ github.sha }}" "$DEST"
           test -f "$DEST/gvm/VERSION"
-          grep -q '1.1.0' "$DEST/gvm/VERSION"
+          grep -q '1.1.1' "$DEST/gvm/VERSION"
           echo "dest=$DEST" >> "$GITHUB_OUTPUT"
           ls -la "$DEST/gvm/scripts"
 

@@ -27,6 +27,7 @@ Smoke after sourcing:
 
 ```bash
 source /tmp/gvm2-test/gvm/scripts/gvm
+gvm listall --latest
 gvm install go1.22.12 -B
 gvm use go1.22.12
 mkdir -p "/tmp/dir with spaces" && cd "/tmp/dir with spaces"

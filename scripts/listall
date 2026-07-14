@@ -3,16 +3,39 @@
 
 function show_usage() {
 	echo "Usage: gvm listall [options]"
-	echo "    -a, --all                 List all tags."
+	echo "    -a, --all                 List all tags (including weekly/tip)."
+	echo "    -A, --annotate            Annotate versions (default for human output)."
+	echo "    -p, --porcelain           Machine-readable names only (no header/annotations)."
+	echo "        --latest              Print the latest stable go1.x.y and exit."
 	echo "    -h, --help                Display this message."
+	echo
+	echo "Annotations (Go has no official LTS channel):"
+	echo "    latest   Highest stable go1.x.y"
+	echo "    beta     Pre-release beta"
+	echo "    rc       Release candidate"
 }
 
+tag_filter="release"
+porcelain=false
+annotate=true
+latest_only=false
+
 function read_command_line() {
-	tag_filter="release"
 	for i in "$@"; do
 		case $i in
 			-a|--all)
 				tag_filter=""
+			;;
+			-A|--annotate)
+				annotate=true
+				porcelain=false
+			;;
+			-p|--porcelain)
+				porcelain=true
+				annotate=false
+			;;
+			--latest)
+				latest_only=true
 			;;
 			-h|--help*)
 				show_usage
@@ -27,25 +50,91 @@ function read_command_line() {
 	done
 }
 
+# True when tag is a stable go1.x / go1.x.y (excludes beta/rc).
+function is_stable_go() {
+	[[ "$1" =~ ^go[0-9]+(\.[0-9]+)+$ ]]
+}
+
+function version_kind() {
+	local v=$1
+	case "$v" in
+		*beta*) echo "beta" ;;
+		*rc*) echo "rc" ;;
+		*)
+			if is_stable_go "$v"; then
+				echo "stable"
+			else
+				echo ""
+			fi
+			;;
+	esac
+}
+
 read_command_line "$@"
 
-echo
-display_message "gvm gos (available)"
-echo
-versions=$(git ls-remote -t https://github.com/golang/go | awk -F/ '{ print $NF }' | $SORT_PATH)
-if [[ $? -ne 0 ]]; then
+if ! versions=$(git ls-remote -t https://github.com/golang/go | awk -F/ '{ print $NF }'); then
 	display_fatal "Failed to get version list from Google"
 fi
+
+filtered=""
 for version in $versions; do
 	if [[ "$tag_filter" == "release" ]]; then
-		if [[ "${version:0:7}" == "release" ]]; then
-			echo "   $version"
-		elif [[ "${version:0:3}" == "go1" ]]; then
-			echo "   $version"
+		if [[ "${version:0:7}" == "release" ]] || [[ "${version:0:3}" == "go1" ]]; then
+			filtered+="$version"$'\n'
 		fi
 	else
-		echo "   $version"
+		filtered+="$version"$'\n'
 	fi
-done | sort -V
-echo
+done
 
+sorted=$(printf '%s' "$filtered" | $SORT_PATH -V)
+
+latest_stable=""
+while IFS= read -r version; do
+	[[ -z "$version" ]] && continue
+	if is_stable_go "$version"; then
+		latest_stable=$version
+	fi
+done <<< "$sorted"
+
+if [[ "$latest_only" == true ]]; then
+	if [[ -z "$latest_stable" ]]; then
+		display_fatal "Could not determine latest stable Go version"
+	fi
+	echo "$latest_stable"
+	exit 0
+fi
+
+if [[ "$porcelain" != true ]]; then
+	echo
+	display_message "gvm gos (available)"
+	echo
+fi
+
+while IFS= read -r version; do
+	[[ -z "$version" ]] && continue
+	if [[ "$annotate" == true ]]; then
+		kind=$(version_kind "$version")
+		note=""
+		case "$kind" in
+			beta) note="beta" ;;
+			rc) note="rc" ;;
+			stable)
+				if [[ "$version" == "$latest_stable" ]]; then
+					note="latest"
+				fi
+				;;
+		esac
+		if [[ -n "$note" ]]; then
+			printf '   %-16s # %s\n' "$version" "$note"
+		else
+			printf '   %s\n' "$version"
+		fi
+	else
+		printf '   %s\n' "$version"
+	fi
+done <<< "$sorted"
+
+if [[ "$porcelain" != true ]]; then
+	echo
+fi
