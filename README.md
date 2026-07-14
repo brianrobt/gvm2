@@ -1,6 +1,6 @@
 # gvm2
 
-> **Status: stable for daily use (v1.1.1)**
+> **Status: stable for daily use (v1.2.0)**
 >
 > gvm2 is a community reboot of the Go Version Manager. Please file bugs and
 > contributions against this repository. Production use is supported for the
@@ -62,7 +62,7 @@ triage groups the backlog into these priorities:
 |----------|------|----------|----------------|
 | P0 | Shell integration (`cd`, PATH, zsh) | [#527](https://github.com/moovweb/gvm/issues/527), [#528](https://github.com/moovweb/gvm/issues/528), [#515](https://github.com/moovweb/gvm/issues/515) | Fixed in 1.1.0 |
 | P1 | Install / bootstrap | [#530](https://github.com/moovweb/gvm/issues/530), [#480](https://github.com/moovweb/gvm/issues/480) | Fixed in 1.1.0 |
-| P2 | UX / docs / ergonomics | [#517](https://github.com/moovweb/gvm/issues/517), [#516](https://github.com/moovweb/gvm/issues/516) | Fixed in 1.1.1 ([#4](https://github.com/brianrobt/gvm2/issues/4)) |
+| P2 | UX / docs / ergonomics | [#517](https://github.com/moovweb/gvm/issues/517), [#516](https://github.com/moovweb/gvm/issues/516) | Fixed in 1.2.0 ([#4](https://github.com/brianrobt/gvm2/issues/4)) |
 | P3 | Features (progress bars, worktrees, auto-detect `go.mod`) | [#514](https://github.com/moovweb/gvm/issues/514), [#523](https://github.com/moovweb/gvm/issues/523) | Backlog |
 
 Tracked here: [brianrobt/gvm2/issues](https://github.com/brianrobt/gvm2/issues).
