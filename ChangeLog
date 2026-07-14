@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - Fresh-install locale prompt mentions `gvm listall --latest`.
+- Remove `AGENTS.md` from the repo (agent guidance belongs in Cursor User Rules, not GitHub).
 
 ## [1.1.0] - 2026-07-13
 
@@ -30,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `gvm list --porcelain` and `gvm pkgset list --porcelain` for machine-readable output.
 - `GVM_NO_CD=1` to disable the `cd` auto-switch hook.
 - GitHub Actions CI (Ubuntu/macOS, bash/zsh smoke).
-- Project `AGENTS.md` and issue triage labels (`p0-shell`, `p1-bootstrap`, …).
+- Issue triage labels (`p0-shell`, `p1-bootstrap`, …).
 
 ### Fixed
 
