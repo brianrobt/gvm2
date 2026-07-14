@@ -47,6 +47,13 @@ Set `GVM_NO_CD=1` before sourcing to skip the `cd` hook (performance / autofs).
 
 ## Conventions
 
-- Conventional Commits; no AI co-author trailers.
+- Conventional Commits.
+- **Git authorship (required):** commits must be authored solely by the repo owner
+  (`Brian Thompson <brianrobt@pm.me>`). Do not set Cursor Agent (or any other AI /
+  bot identity) as author or committer. Do not add `Co-authored-by` / AI
+  co-author trailers. If the environment defaults to an agent identity, override
+  with `user.name` / `user.email` (or `GIT_AUTHOR_*` / `GIT_COMMITTER_*`) before
+  committing, and strip any injected co-author trailers (including from
+  `commit-msg` hooks) before push.
 - Prefer binary install (`-B` / auto prefer-binary) over documenting go1.4 chains.
 - Do not rename the `gvm` CLI or `~/.gvm` path without an explicit migration plan.
