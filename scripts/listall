@@ -131,7 +131,7 @@ while IFS= read -r version; do
 			printf '   %s\n' "$version"
 		fi
 	else
-		printf '   %s\n' "$version"
+		printf '%s\n' "$version"
 	fi
 done <<< "$sorted"
 
