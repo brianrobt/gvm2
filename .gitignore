@@ -9,3 +9,7 @@ tmp/
 scripts/gvm
 Gemfile.lock
 .vagrant/
+
+# Local planning artifacts — do not commit (see .cursor/rules)
+docs/plans/
+docs/brainstorms/
