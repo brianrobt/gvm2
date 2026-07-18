@@ -5,6 +5,12 @@ All notable changes to gvm2 are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- Stop duplicating `GOPATH`/`PATH` when creating the `global` pkgset environment (`pkgset-create` and installer `system@global`) (#8).
+
 ## [1.2.0] - 2026-07-14
 
 ### Added
