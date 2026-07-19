@@ -5,7 +5,9 @@ All notable changes to gvm2 are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+See [RELEASING.md](RELEASING.md) for the release process.
+
+## [1.2.1] - 2026-07-19
 
 ### Fixed
 
