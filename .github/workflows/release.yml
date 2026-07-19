@@ -27,33 +27,15 @@ jobs:
 
       - name: Extract changelog for this version
         id: changelog
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          # Extract the section for this version from ChangeLog
-          # Matches from "## [X.Y.Z]" until the next "## [" or end of file
-          NOTES=$(awk -v ver="$VERSION" '
-            /^## \[/ {
-              if (found) exit
-              if (index($0, "## [" ver "]")) found=1
-              next
-            }
-            found { print }
-          ' ChangeLog)
-
-          if [ -z "$NOTES" ]; then
-            echo "::warning::No changelog entry found for version $VERSION"
-            NOTES="Release $VERSION"
-          fi
-
-          # Write to file for the release body (handles multiline)
-          echo "$NOTES" > /tmp/release-notes.md
-          echo "notes_file=/tmp/release-notes.md" >> "$GITHUB_OUTPUT"
+        uses: ffurrer2/extract-release-notes@v2
+        with:
+          changelog_file: ChangeLog
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: v${{ github.ref_name }}
-          body_path: ${{ steps.changelog.outputs.notes_file }}
+          name: ${{ github.ref_name }}
+          body: ${{ steps.changelog.outputs.release_notes }}
           draft: false
           prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
         env:
