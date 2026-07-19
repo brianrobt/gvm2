@@ -1,13 +1,8 @@
 display_warning() {
-	command -v tput &> /dev/null
-	if [[ "$?" == "0" ]]  && [[ "$TERM" == "xterm" ]]; then
-		# YELLOW!
-		tput sgr0
-		tput setaf 3
-		echo "WARNING: $1"
-		tput sgr0
+	if [[ "$TERM" == "xterm" ]] || [[ "$TERM" == "xterm-256color" ]]; then
+		printf '\033[0;33mWARNING: %s\033[0m\n' "$1"
 	else
-		echo "$1"
+		echo "WARNING: $1"
 	fi
 	return 1
 }
