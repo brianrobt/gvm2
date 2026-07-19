@@ -214,15 +214,31 @@ download_binary() {
 	GO_BINARY_URL="${GO_BINARY_BASE_URL}/${GO_BINARY_FILE}"
 	GO_BINARY_PATH=${GVM_ROOT}/archive/${GO_BINARY_FILE}
 
-	if [ ! -f $GO_BINARY_PATH ]; then
-		curl -s -f -L $GO_BINARY_URL > ${GO_BINARY_PATH}
-
-		if [[ $? -ne 0 ]]; then
-			display_error "Failed to download binary go"
-			rm -rf $GO_INSTALL_ROOT
-			rm -f $GO_BINARY_PATH
+	if [ ! -f "$GO_BINARY_PATH" ]; then
+		mkdir -p "${GVM_ROOT}/archive" || {
+			display_error "Failed to create archive directory"
+			rm -rf "$GO_INSTALL_ROOT"
 			exit 1
-		fi
+		}
+		# go.dev occasionally flakes under parallel CI; retry before failing.
+		_dl_attempt=1
+		_dl_max=3
+		while [ "${_dl_attempt}" -le "${_dl_max}" ]; do
+			if curl -sS -f -L --retry 2 --retry-delay 1 \
+				-o "${GO_BINARY_PATH}" "${GO_BINARY_URL}"; then
+				break
+			fi
+			rm -f "${GO_BINARY_PATH}"
+			if [ "${_dl_attempt}" -eq "${_dl_max}" ]; then
+				display_error "Failed to download binary go"
+				rm -rf "$GO_INSTALL_ROOT"
+				exit 1
+			fi
+			display_warning "Binary download failed (attempt ${_dl_attempt}/${_dl_max}); retrying..."
+			_dl_attempt=$((_dl_attempt + 1))
+			sleep "${_dl_attempt}"
+		done
+		unset _dl_attempt _dl_max
 	fi
 
 	tar zxf ${GO_BINARY_PATH} -C $GO_INSTALL_ROOT --strip-components 1 >> "${GVM_ROOT}/logs/go-${GO_NAME}-download-binary" 2>&1

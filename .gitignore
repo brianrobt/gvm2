@@ -9,3 +9,8 @@ tmp/
 scripts/gvm
 Gemfile.lock
 .vagrant/
+
+# Local-only AI / planning artifacts — do not commit
+.cursor/
+docs/plans/
+docs/brainstorms/
