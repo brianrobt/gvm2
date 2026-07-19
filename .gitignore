@@ -10,6 +10,7 @@ scripts/gvm
 Gemfile.lock
 .vagrant/
 
-# Local planning artifacts — do not commit (see .cursor/rules)
+# Local-only AI / planning artifacts — do not commit
+.cursor/
 docs/plans/
 docs/brainstorms/
