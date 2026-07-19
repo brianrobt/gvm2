@@ -1,10 +1,6 @@
 display_fatal() {
-	command -v tput &> /dev/null
-	if [[ "$?" == "0" ]]  && [[ "$TERM" == "xterm" ]]; then
-		tput sgr0
-		tput setaf 1
-		echo "ERROR: $1" >&2
-		tput sgr0
+	if [[ "$TERM" == "xterm" ]] || [[ "$TERM" == "xterm-256color" ]]; then
+		printf '\033[0;31mERROR: %s\033[0m\n' "$1" >&2
 	else
 		echo "ERROR: $1" >&2
 	fi

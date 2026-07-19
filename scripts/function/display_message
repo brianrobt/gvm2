@@ -1,11 +1,6 @@
 display_message() {
-	command -v tput &> /dev/null
-	if [[ "$?" == "0" ]]  && [[ "$TERM" == "xterm" ]]; then
-		# GREEN!
-		tput sgr0
-		tput setaf 2
-		echo "$1"
-		tput sgr0
+	if [[ "$TERM" == "xterm" ]] || [[ "$TERM" == "xterm-256color" ]]; then
+		printf '\033[0;32m%s\033[0m\n' "$1"
 	else
 		echo "$1"
 	fi
