@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate tag matches VERSION file
+        run: |
+          VERSION_FILE=$(cat VERSION | tr -d '[:space:]')
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$VERSION_FILE" != "$TAG_VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match VERSION file ($VERSION_FILE)"
+            exit 1
+          fi
+          echo "Version validated: $VERSION_FILE"
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # Extract the section for this version from ChangeLog
+          # Matches from "## [X.Y.Z]" until the next "## [" or end of file
+          NOTES=$(awk -v ver="$VERSION" '
+            /^## \[/ {
+              if (found) exit
+              if (index($0, "## [" ver "]")) found=1
+              next
+            }
+            found { print }
+          ' ChangeLog)
+
+          if [ -z "$NOTES" ]; then
+            echo "::warning::No changelog entry found for version $VERSION"
+            NOTES="Release $VERSION"
+          fi
+
+          # Write to file for the release body (handles multiline)
+          echo "$NOTES" > /tmp/release-notes.md
+          echo "notes_file=/tmp/release-notes.md" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: v${{ github.ref_name }}
+          body_path: ${{ steps.changelog.outputs.notes_file }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
