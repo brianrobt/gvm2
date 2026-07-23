@@ -3,6 +3,7 @@
 
 function show_usage() {
 	echo "Usage: gvm install [version] [options]"
+	echo "       gvm install [options]           # auto-detect from .go-version / go.mod"
 	echo "    -s,  --source=SOURCE      Install Go from specified source."
 	echo "    -n,  --name=NAME          Override the default name for this version."
 	echo "    -pb, --with-protobuf      Install Go protocol buffers."
@@ -10,16 +11,17 @@ function show_usage() {
 	echo "    -B,  --binary             Only install from binary."
 	echo "         --prefer-binary      Attempt a binary install, falling back to source."
 	echo "    -h,  --help               Display this message."
+	echo
+	echo "With no version, resolve from the nearest .go-version or go.mod"
+	echo "(toolchain / go directive; language versions map to the latest"
+	echo "available patch for that minor)."
 }
 
 read_command_line() {
-	VERSION=$1
-	if [[ "${VERSION:0:1}" != "-" ]]; then
+	VERSION=""
+	if [[ $# -gt 0 && "${1:0:1}" != "-" ]]; then
+		VERSION=$1
 		shift
-	else
-		display_warning "Invalid version: $1"
-		show_usage
-		exit 1
 	fi
 	GO_SOURCE_URL=https://github.com/golang/go
 	for i in "$@"; do
@@ -348,7 +350,11 @@ install_from_source() {
 main() {
 	trap 'display_fatal "Canceled!"' INT
 	read_command_line "$@"
-	[[ "$VERSION" == "" ]] && display_fatal "No version specified"
+	if [[ "$VERSION" == "" ]]; then
+		VERSION="$(__gvm_resolve_project_go_version available)" || VERSION=""
+		[[ -n "$VERSION" ]] || display_fatal "No version specified (and no .go-version / go.mod found)"
+		display_message "Auto-detected version $VERSION"
+	fi
 
 	if [[ "$GO_NAME" == "" ]]; then
 		GO_NAME=$VERSION

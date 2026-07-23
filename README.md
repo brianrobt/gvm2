@@ -1,6 +1,6 @@
 # gvm2
 
-> **Status: stable for daily use (v1.2.0)**
+> **Status: stable for daily use (v1.3.0)**
 >
 > gvm2 is a community reboot of the Go Version Manager. Please file bugs and
 > contributions against this repository. Production use is supported for the
@@ -21,6 +21,15 @@ gvm use go1.22.12 --default
 go version
 ```
 
+In a module directory you can omit the version — gvm2 reads `.go-version` or
+`go.mod` (`toolchain` / `go` line) and maps language versions like `go 1.22` to
+the latest matching patch:
+
+```bash
+gvm install -B              # install version from go.mod / .go-version
+gvm use                     # select matching installed version
+```
+
 Common commands (nvm-style workflow):
 
 | Goal | Command |
@@ -28,7 +37,9 @@ Common commands (nvm-style workflow):
 | List available versions | `gvm listall` |
 | Latest stable name only | `gvm listall --latest` |
 | Install a version | `gvm install go1.22.12` |
+| Install from project files | `gvm install` (or `gvm install -B`) |
 | Switch version | `gvm use go1.22.12` |
+| Switch from project files | `gvm use` |
 | List installed versions | `gvm list` |
 | Per-directory auto-switch | commit a `.go-version` (and optional `.go-pkgset`) |
 
@@ -63,7 +74,7 @@ triage groups the backlog into these priorities:
 | P0 | Shell integration (`cd`, PATH, zsh) | [#527](https://github.com/moovweb/gvm/issues/527), [#528](https://github.com/moovweb/gvm/issues/528), [#515](https://github.com/moovweb/gvm/issues/515) | Fixed in 1.1.0 |
 | P1 | Install / bootstrap | [#530](https://github.com/moovweb/gvm/issues/530), [#480](https://github.com/moovweb/gvm/issues/480) | Fixed in 1.1.0 |
 | P2 | UX / docs / ergonomics | [#517](https://github.com/moovweb/gvm/issues/517), [#516](https://github.com/moovweb/gvm/issues/516) | Fixed in 1.2.0 ([#4](https://github.com/brianrobt/gvm2/issues/4)) |
-| P3 | Features (progress bars, worktrees, auto-detect `go.mod`) | [#514](https://github.com/moovweb/gvm/issues/514), [#523](https://github.com/moovweb/gvm/issues/523) | Backlog |
+| P3 | Features (progress bars, worktrees, auto-detect `go.mod`) | [#514](https://github.com/moovweb/gvm/issues/514), [#523](https://github.com/moovweb/gvm/issues/523) | `go.mod` auto-detect in 1.3.0 ([#10](https://github.com/brianrobt/gvm2/issues/10)); progress / worktrees still backlog |
 
 Tracked here: [brianrobt/gvm2/issues](https://github.com/brianrobt/gvm2/issues).
 
@@ -72,6 +83,7 @@ Pull requests and other contributions are very much appreciated.
 ## Features
 
 * Install/Uninstall Go versions with `gvm install [tag]` where tag is "go1.22.12", "go1", "weekly.2011-11-08", or "tip"
+* Omit the version on `gvm install` / `gvm use` to resolve from `.go-version` or `go.mod`
 * List available versions with `gvm listall` (annotations + `--latest` / `--porcelain`)
 * List added/removed files in GOROOT with `gvm diff`
 * Manage GOPATHs with `gvm pkgset [create/use/delete] [name]`. Use `--local` as `name` to manage repository under local path (`/path/to/repo/.gvm_local`).

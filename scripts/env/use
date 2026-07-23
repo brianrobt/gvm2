@@ -14,6 +14,7 @@
 # <pre>@textblock</pre>
 #   Usage: gvm use [--version] <value> [--pkgset <value>] [--default]
 #          gvm use <version-name>@<pkgset-name> [--default]
+#          gvm use [--pkgset <value>] [--default]   # auto-detect from .go-version / go.mod
 #
 #   Options:
 #     --version value       version name
@@ -22,7 +23,8 @@
 #     --quiet               suppress 'now using' acknowledgements
 #     -h, --help            show this message
 #
-#   When using --pkgset, you must also specify a go version name.
+#   With no version, resolve from the nearest .go-version (preferred) or go.mod.
+#   When using --pkgset, you must also specify a go version name (or auto-detect).
 # @/textblock</pre>
 # @param args Variable list of options and values
 # @return Returns success (status 0) if a pkgset was selected successfully or
@@ -138,6 +140,7 @@ gvm_use() {
         then
             echo "Usage: gvm use [--version] <value> [--pkgset <value>] [--default]"
             echo "       gvm use <version-name>@<pkgset-name> [--default]"
+            echo "       gvm use [--pkgset <value>] [--default]"
             echo
             echo "Options:"
             echo "  --version value       go version name or alias"
@@ -146,7 +149,9 @@ gvm_use() {
             echo "  --quiet               suppress 'now using' acknowledgements"
             echo "  -h, --help            show this message"
             echo
-            echo "When using --pkgset, you must also specify a go version name."
+            echo "With no version, resolve from the nearest .go-version or go.mod"
+            echo "(toolchain / go directive; language versions map to the latest"
+            echo "installed patch for that minor)."
             echo
             return 0
         else
@@ -194,8 +199,14 @@ gvm_use() {
 
     if [[ -z "${version}" ]]
     then
-        display_error "Please specify the version. Execute 'gvm use --help' for command help."
-        return 1
+        # Bare `gvm use`: resolve from .go-version / go.mod (#10 / moovweb/gvm#523).
+        version="$(__gvm_resolve_project_go_version installed)" || version=""
+        if [[ -z "${version}" ]]
+        then
+            display_error "Please specify the version (or add .go-version / go.mod). Execute 'gvm use --help' for command help."
+            return 1
+        fi
+        [[ "${GVM_DEBUG}" -eq 1 ]] && echo "Auto-detected version: ${version}"
     fi
 
     # Exact match first, then prefix match — avoid fragile multi-grep pipelines under `set -e`.

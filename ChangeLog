@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 See [RELEASING.md](RELEASING.md) for the release process.
 
+## [1.3.0] - 2026-07-23
+
+### Added
+
+- `gvm use` / `gvm install` without a version resolve from the nearest `.go-version` or `go.mod` (`toolchain` / `go` directive), mapping language versions like `1.22` to the latest patch (#10 / moovweb/gvm#523).
+- Shared project version helpers; `gvm applymod` uses the same go.mod parsing and patch mapping.
+
+### Fixed
+
+- Directory walk for `.go-version` / `.go-pkgset` / `go.mod` no longer stops at the current directory only, and no longer mutates the caller's working directory.
+- Comment tests: write `go.mod` with single-line `printf` so `tf` does not hang on multi-line quotes; silence expected alias cleanup errors.
+- `.go-version` stays authoritative (no go.mod fallback after a parsed pin); accept plain `1.x.y` pins; bound remote tag listing via git HTTP low-speed abort.
+
+### Changed
+
+- Document empty-string contract for `_bash_pseudo_hash` (no distinct nil values).
+
 ## [1.2.1] - 2026-07-19
 
 ### Fixed

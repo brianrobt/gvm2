@@ -42,7 +42,8 @@ setValueForKeyFakeAssocArray() {
     fi
     # parameter list supports empty arguments!
     local target_key="$1"; shift
-    local new_value="$1"; shift # @todo: need to support setting nil values!
+    # Empty values are stored as empty strings (no distinct nil). Callers use -n checks.
+    local new_value="$1"; shift
     local target_ary; target_ary=()
     local defaultIFS="$IFS"
     local IFS="$defaultIFS"
@@ -137,7 +138,8 @@ valueForKeyFakeAssocArray() {
     local _item
     for _item in "${target_ary[@]}"; do
         if [[ "${_item%%:*}" == "${target_key}" ]]; then
-          value="$(_decode "${_item#*:}")" # @todo: need to support returning nil values!
+          # Missing keys and empty values both surface as "" (no distinct nil).
+          value="$(_decode "${_item#*:}")"
           break
         fi
     done

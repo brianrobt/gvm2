@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+. "$GVM_ROOT/scripts/function/_shell_compat" || return 1
+# Canonical walker lives here; load eagerly so cd / use share one implementation.
+. "$GVM_ROOT/scripts/function/resolve_project_version" || return 1
+
 # __gvm_find_path_upwards()
 # /*!
 # @abstract Search upwards through the directory tree for a target file or
@@ -30,51 +34,13 @@ __gvm_find_path_upwards() {
         echo "" && return 1
     fi
 
-    local found_file="$(__gvmp_find_current_path_for_target "${target}")"
-    echo "${found_file}"
-
-    if [[ -z "${found_file}" ]]; then
-        return 1
-    fi
-
-    return 0
+    __gvm_find_file_upwards "${target}" "${start_dir}" "${final_dir}"
 }
 
+# Compatibility alias for older call sites / tests.
 __gvmp_find_path_for_target() {
-    local target="${1}"
-    local start_dir="${2}"
-    local final_dir="${3}"
-
-    if [[ ${#target} -eq 0 ]]; then
-        echo ""; return 1
-    fi
-
-    # resolve tilde for HOME
-    start_dir="${start_dir/#\~/$HOME}"
-
-    # resolve dot for PWD
-    if [[ "${start_dir}" == "." ]]; then
-        start_dir="$PWD"
-    fi
-
-    local current_dir="${start_dir}"
-    local highest_dir="${final_dir}"
-
-    builtin cd "${current_dir}"
-    while [[ "${current_dir}" != "${highest_dir}" && "${current_dir}" != "/" ]]; do
-        if [[ -f "${current_dir}/${target}" ||  -d "${current_dir}/${target}" ]]; then
-            echo "${current_dir}/${target}"; return 0
-            break
-        fi
-
-        builtin cd ..
-        current_dir="$(pwd)"
-    done
-
-    echo "";
-    return 1
+    __gvm_find_file_upwards "$@"
 }
-
 
 __gvmp_find_current_path_for_target() {
     local target="${1}"

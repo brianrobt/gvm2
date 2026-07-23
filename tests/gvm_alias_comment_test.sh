@@ -1,8 +1,8 @@
 source $GVM_ROOT/scripts/gvm
 
-## Cleanup test objects
-gvm alias delete foo
-gvm alias delete bar
+## Cleanup test objects (may not exist yet — ignore errors)
+gvm alias delete foo > /dev/null 2>&1
+gvm alias delete bar > /dev/null 2>&1
 #######################
 
 gvm alias # status=0
