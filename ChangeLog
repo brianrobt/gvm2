@@ -17,6 +17,7 @@ See [RELEASING.md](RELEASING.md) for the release process.
 ### Fixed
 
 - Directory walk for `.go-version` / `.go-pkgset` / `go.mod` no longer stops at the current directory only, and no longer mutates the caller's working directory.
+- Comment tests: write `go.mod` with single-line `printf` so `tf` does not hang on multi-line quotes; silence expected alias cleanup errors.
 
 ### Changed
 
