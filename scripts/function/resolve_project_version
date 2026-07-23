@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# source once and only once!
+[[ ${GVM_RESOLVE_PROJECT_VERSION:-} -eq 1 ]] && return || readonly GVM_RESOLVE_PROJECT_VERSION=1
+
 . "$GVM_ROOT/scripts/function/_shell_compat" || return 1
 
 # __gvm_find_file_upwards()
@@ -135,8 +138,12 @@ __gvm_read_dot_go_version_file() {
 		_line="${_line#"${_line%%[![:space:]]*}"}"
 		_line="${_line%"${_line##*[![:space:]]}"}"
 		[[ -z "${_line}" ]] && continue
+		# Accept go1.22.12 and ecosystem-style plain 1.22.12.
 		if __gvm_rematch "${_line}" '^(go([0-9]+(\.[0-9]+)*([a-z0-9]+)?))$'; then
 			version="${GVM_REMATCH[1]}"
+			break
+		elif __gvm_rematch "${_line}" '^([0-9]+(\.[0-9]+)*([a-z0-9]+)?)$'; then
+			version="go${GVM_REMATCH[1]}"
 			break
 		fi
 	done < "${filepath}"
@@ -230,7 +237,14 @@ __gvm_list_available_go_tags() {
 	local versions=""
 	local version=""
 
-	if ! versions="$(git ls-remote -t https://github.com/golang/go 2>/dev/null | awk -F/ '{ print $NF }')"; then
+	# No repo-wide timeout helper; use git HTTP low-speed abort (portable vs `timeout(1)`).
+	if ! versions="$(
+		GIT_TERMINAL_PROMPT=0 git \
+			-c http.lowSpeedLimit=1024 \
+			-c http.lowSpeedTime=30 \
+			ls-remote -t https://github.com/golang/go 2>/dev/null |
+			awk -F/ '{ print $NF }'
+	)"; then
 		echo ""
 		return 1
 	fi
@@ -323,16 +337,18 @@ __gvm_resolve_project_go_version() {
 	if path="$(__gvm_find_file_upwards ".go-version")"; then
 		hint="$(__gvm_read_dot_go_version_file "${path}")" || hint=""
 		if [[ -n "${hint}" ]]; then
+			# .go-version is authoritative once parsed — never fall through to go.mod.
 			mapped="$(__gvm_map_version_hint_to_tag "${hint}" "${scope}")" || mapped=""
 			if [[ -n "${mapped}" ]]; then
 				echo "${mapped}"
 				return 0
 			fi
-			# Exact pin from .go-version: return as-is for install attempts.
 			if [[ "${scope}" == "available" ]]; then
 				echo "${hint}"
 				return 0
 			fi
+			echo ""
+			return 1
 		fi
 	fi
 
