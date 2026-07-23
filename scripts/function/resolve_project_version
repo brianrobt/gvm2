@@ -1,0 +1,352 @@
+#!/usr/bin/env bash
+
+. "$GVM_ROOT/scripts/function/_shell_compat" || return 1
+
+# __gvm_find_file_upwards()
+# /*!
+# @abstract Walk from start_dir toward final_dir looking for a basename.
+# @discussion
+# Does not change the caller's working directory. Stops at final_dir or /.
+# @param target Basename to find
+# @param start_dir Optional start (default: PWD)
+# @param final_dir Optional stop directory (default: HOME)
+# @return Path to found file (status 0) or empty string (status 1)
+# */
+__gvm_find_file_upwards() {
+	local target="${1}"
+	local start_dir="${2:-$PWD}"
+	local final_dir="${3:-$HOME}"
+	local current_dir=""
+	local stop_dir=""
+	local parent=""
+
+	if [[ -z "${target}" || -z "${start_dir}" ]]; then
+		echo ""
+		return 1
+	fi
+
+	start_dir="${start_dir/#\~/$HOME}"
+	final_dir="${final_dir/#\~/$HOME}"
+	[[ "${start_dir}" == "." ]] && start_dir="$PWD"
+
+	current_dir="$(builtin cd "${start_dir}" 2>/dev/null && pwd)" || {
+		echo ""
+		return 1
+	}
+	stop_dir="$(builtin cd "${final_dir}" 2>/dev/null && pwd)" || stop_dir="/"
+
+	while true; do
+		if [[ -e "${current_dir}/${target}" ]]; then
+			echo "${current_dir}/${target}"
+			return 0
+		fi
+		if [[ "${current_dir}" == "${stop_dir}" || "${current_dir}" == "/" ]]; then
+			break
+		fi
+		# Avoid external `dirname` — PATH may be gvm-munged without /usr/bin.
+		parent="${current_dir%/*}"
+		[[ -z "${parent}" ]] && parent="/"
+		[[ "${parent}" == "${current_dir}" ]] && break
+		current_dir="${parent}"
+	done
+
+	echo ""
+	return 1
+}
+
+# __gvm_parse_go_mod_version()
+# /*!
+# @abstract Read language / toolchain version from a go.mod file.
+# @discussion
+# Prefer an explicit \`toolchain go1.x.y\` line when present (exact gvm tag).
+# Otherwise parse the \`go X.Y[.Z]\` directive and return a language version
+# string like \`1.22\` or \`1.22.5\` (without the \`go\` prefix).
+# @param go_mod_path Path to go.mod
+# @return Version string (status 0) or empty (status 1)
+# */
+__gvm_parse_go_mod_version() {
+	local go_mod_path="${1}"
+	local line=""
+	local rest=""
+	local toolchain=""
+	local lang_ver=""
+
+	if [[ -z "${go_mod_path}" || ! -f "${go_mod_path}" ]]; then
+		echo ""
+		return 1
+	fi
+
+	while IFS= read -r line || [[ -n "${line}" ]]; do
+		line="${line%$'\r'}"
+		line="${line#"${line%%[![:space:]]*}"}"
+		line="${line%"${line##*[![:space:]]}"}"
+		[[ -z "${line}" || "${line}" == //* ]] && continue
+
+		# Rematch convention: GVM_REMATCH[1] must equal the full match string
+		# (zsh drops 0-based index after __gvm_rematch). Strip prefixes first.
+		if [[ "${line}" == toolchain[[:space:]]* ]]; then
+			rest="${line#toolchain}"
+			rest="${rest#"${rest%%[![:space:]]*}"}"
+			if __gvm_rematch "${rest}" '^(go[0-9]+(\.[0-9]+)*([a-z0-9]+)?)$'; then
+				toolchain="${GVM_REMATCH[1]}"
+			fi
+		elif [[ "${line}" == go[[:space:]]* ]]; then
+			rest="${line#go}"
+			rest="${rest#"${rest%%[![:space:]]*}"}"
+			if __gvm_rematch "${rest}" '^([0-9]+(\.[0-9]+)*)$'; then
+				lang_ver="${GVM_REMATCH[1]}"
+			fi
+		fi
+	done < "${go_mod_path}"
+
+
+	if [[ -n "${toolchain}" ]]; then
+		echo "${toolchain}"
+		return 0
+	fi
+	if [[ -n "${lang_ver}" ]]; then
+		echo "${lang_ver}"
+		return 0
+	fi
+
+	echo ""
+	return 1
+}
+
+# __gvm_read_dot_go_version_file()
+# /*!
+# @abstract Read first non-comment go version name from a .go-version file.
+# @param filepath Path to .go-version
+# @return Tag like go1.22.12 (status 0) or empty (status 1)
+# */
+__gvm_read_dot_go_version_file() {
+	local filepath="${1}"
+	local version=""
+	local _line=""
+
+	[[ -f "${filepath}" ]] || {
+		echo ""
+		return 1
+	}
+
+	while IFS= read -r _line || [[ -n "${_line}" ]]; do
+		_line="${_line%$'\r'}"
+		[[ "${_line}" =~ ^[[:space:]]*# ]] && continue
+		_line="${_line#"${_line%%[![:space:]]*}"}"
+		_line="${_line%"${_line##*[![:space:]]}"}"
+		[[ -z "${_line}" ]] && continue
+		if __gvm_rematch "${_line}" '^(go([0-9]+(\.[0-9]+)*([a-z0-9]+)?))$'; then
+			version="${GVM_REMATCH[1]}"
+			break
+		fi
+	done < "${filepath}"
+
+	echo "${version}"
+	[[ -n "${version}" ]]
+}
+
+# __gvm_normalize_go_version_hint()
+# /*!
+# @abstract Normalize hints like \`1.22\`, \`go1.22\`, \`go1.22.5\` to a tag prefix.
+# @param hint Version hint from go.mod or user input
+# @return Tag or prefix like go1.22 / go1.22.5 (status 0) or empty (status 1)
+# */
+__gvm_normalize_go_version_hint() {
+	local hint="${1}"
+
+	[[ -n "${hint}" ]] || {
+		echo ""
+		return 1
+	}
+
+	if __gvm_rematch "${hint}" '^go[0-9]'; then
+		echo "${hint}"
+		return 0
+	fi
+	if __gvm_rematch "${hint}" '^[0-9]+(\.[0-9]+)*([a-z0-9]+)?$'; then
+		echo "go${hint}"
+		return 0
+	fi
+
+	echo ""
+	return 1
+}
+
+# __gvm_is_stable_go_tag()
+# True for stable go1.x / go1.x.y tags (excludes beta/rc).
+__gvm_is_stable_go_tag() {
+	__gvm_rematch "${1}" '^go[0-9]+(\.[0-9]+)+$'
+}
+
+# __gvm_latest_matching_go_tag()
+# /*!
+# @abstract Pick the highest stable tag matching a prefix from a newline list.
+# @param prefix Tag or prefix (e.g. go1.22 or go1.22.5)
+# @param versions Newline-separated candidate tags
+# @return Best matching tag (status 0) or empty (status 1)
+# */
+__gvm_latest_matching_go_tag() {
+	local prefix="${1}"
+	local versions="${2}"
+	local best=""
+	local candidate=""
+	local exact=false
+	local sort_cmd="${SORT_PATH:-sort}"
+
+	[[ -n "${prefix}" ]] || {
+		echo ""
+		return 1
+	}
+
+	# Exact patch/prerelease request: prefer exact match when present.
+	if __gvm_rematch "${prefix}" '^go[0-9]+\.[0-9]+\.[0-9]+([a-z0-9]+)?$'; then
+		exact=true
+	fi
+
+	while IFS= read -r candidate; do
+		[[ -z "${candidate}" ]] && continue
+		if [[ "${exact}" == true ]]; then
+			if [[ "${candidate}" == "${prefix}" ]]; then
+				echo "${candidate}"
+				return 0
+			fi
+			continue
+		fi
+		if [[ "${candidate}" == "${prefix}" || "${candidate}" == "${prefix}".* ]]; then
+			__gvm_is_stable_go_tag "${candidate}" || continue
+			best="${candidate}"
+		fi
+	done <<< "$(printf '%s\n' "${versions}" | "${sort_cmd}" -V)"
+
+	echo "${best}"
+	[[ -n "${best}" ]]
+}
+
+# __gvm_list_available_go_tags()
+# /*!
+# @abstract List remote go tags (go1* / release*), one per line.
+# */
+__gvm_list_available_go_tags() {
+	local versions=""
+	local version=""
+
+	if ! versions="$(git ls-remote -t https://github.com/golang/go 2>/dev/null | awk -F/ '{ print $NF }')"; then
+		echo ""
+		return 1
+	fi
+
+	for version in ${versions}; do
+		if [[ "${version:0:7}" == "release" || "${version:0:3}" == "go1" ]]; then
+			printf '%s\n' "${version}"
+		fi
+	done
+	return 0
+}
+
+# __gvm_list_installed_go_tags()
+# /*!
+# @abstract List installed go version directory names.
+# */
+__gvm_list_installed_go_tags() {
+	local dir=""
+	[[ -d "${GVM_ROOT}/gos" ]] || {
+		echo ""
+		return 1
+	}
+	for dir in "${GVM_ROOT}/gos"/*; do
+		[[ -d "${dir}" ]] || continue
+		printf '%s\n' "${dir##*/}"
+	done
+	return 0
+}
+
+# __gvm_map_version_hint_to_tag()
+# /*!
+# @abstract Map a language/tag hint to an installable gvm tag.
+# @param hint Normalized or raw hint (1.22 / go1.22 / go1.22.12)
+# @param scope \`installed\` (default) or \`available\`
+# @return Concrete tag (status 0) or empty (status 1)
+# */
+__gvm_map_version_hint_to_tag() {
+	local hint="${1}"
+	local scope="${2:-installed}"
+	local prefix=""
+	local candidates=""
+	local matched=""
+
+	prefix="$(__gvm_normalize_go_version_hint "${hint}")" || {
+		echo ""
+		return 1
+	}
+
+	if [[ "${scope}" == "available" ]]; then
+		candidates="$(__gvm_list_available_go_tags)" || candidates=""
+	else
+		candidates="$(__gvm_list_installed_go_tags)" || candidates=""
+	fi
+
+	matched="$(__gvm_latest_matching_go_tag "${prefix}" "${candidates}")" || matched=""
+	if [[ -n "${matched}" ]]; then
+		echo "${matched}"
+		return 0
+	fi
+
+	# For available scope with an exact tag request, return the tag itself so
+	# install can attempt it even if listing failed transiently.
+	if [[ "${scope}" == "available" ]] && __gvm_rematch "${prefix}" '^go[0-9]+\.[0-9]+\.[0-9]+([a-z0-9]+)?$'; then
+		echo "${prefix}"
+		return 0
+	fi
+
+	echo ""
+	return 1
+}
+
+# __gvm_resolve_project_go_version()
+# /*!
+# @abstract Resolve Go version from the nearest project files.
+# @discussion
+# Precedence:
+#   1. \`.go-version\` (explicit gvm pin)
+#   2. \`go.mod\` \`toolchain\` line, else \`go\` directive (mapped to latest patch)
+#
+# @param scope Optional \`installed\` (default, for \`gvm use\`) or \`available\`
+#   (for \`gvm install\`).
+# @return Concrete gvm tag like go1.22.12 (status 0) or empty (status 1)
+# */
+__gvm_resolve_project_go_version() {
+	local scope="${1:-installed}"
+	local path=""
+	local hint=""
+	local mapped=""
+
+	if path="$(__gvm_find_file_upwards ".go-version")"; then
+		hint="$(__gvm_read_dot_go_version_file "${path}")" || hint=""
+		if [[ -n "${hint}" ]]; then
+			mapped="$(__gvm_map_version_hint_to_tag "${hint}" "${scope}")" || mapped=""
+			if [[ -n "${mapped}" ]]; then
+				echo "${mapped}"
+				return 0
+			fi
+			# Exact pin from .go-version: return as-is for install attempts.
+			if [[ "${scope}" == "available" ]]; then
+				echo "${hint}"
+				return 0
+			fi
+		fi
+	fi
+
+	if path="$(__gvm_find_file_upwards "go.mod")"; then
+		hint="$(__gvm_parse_go_mod_version "${path}")" || hint=""
+		if [[ -n "${hint}" ]]; then
+			mapped="$(__gvm_map_version_hint_to_tag "${hint}" "${scope}")" || mapped=""
+			if [[ -n "${mapped}" ]]; then
+				echo "${mapped}"
+				return 0
+			fi
+		fi
+	fi
+
+	echo ""
+	return 1
+}

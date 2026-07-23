@@ -24,6 +24,19 @@ if grep -q 'global:$GOPATH' "$GVM_DEST/gvm/environments/go1.22.12@global"; then
   echo "FAIL: go1.22.12@global has duplicated global GOPATH prefix" >&2
   exit 1
 fi
+# Auto-detect from go.mod (#10)
+moddir="$GVM_DEST/mod-detect"
+mkdir -p "$moddir/subdir"
+cat > "$moddir/go.mod" <<'EOF'
+module example.com/detect
+
+go 1.22
+EOF
+(
+  cd "$moddir/subdir"
+  gvm use
+  go version | grep -E 'go1\.22\.'
+)
 spaced="$GVM_DEST/dir with spaces"
 mkdir -p "$spaced"
 cd "$spaced"

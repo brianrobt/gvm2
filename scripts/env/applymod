@@ -2,29 +2,33 @@
 . "$GVM_ROOT/scripts/functions"
 
 function gvm_applymod(){
+	local mod_path=""
+	local hint=""
+	local version=""
 
-	mod_file=go.mod
-	if [ ! -f $mod_file ]; then
+	if ! mod_path="$(__gvm_find_file_upwards "go.mod")"; then
 		return $(display_error "can not find go.mod")
 	fi
 
-	mod_ver=$(cat go.mod | grep -E 'go [[:digit:]]+.[[:digit:]]+' | tr -d ' ' | tr -d '\n')
-    mod_name=$(cat go.mod | grep 'module ' | tr -d '\n')
-	display_message "$mod_name use go version: $mod_ver"
+	hint="$(__gvm_parse_go_mod_version "${mod_path}")" || hint=""
+	[[ -n "${hint}" ]] || return $(display_error "can not parse go version from go.mod")
 
-	if [ $(gvm list | grep $mod_ver | wc -l | tr -d '\n') -lt 1 ]; then
-		if [ $(gvm listall -a| grep $mod_ver | wc -l | tr -d '\n') -lt 1 ]; then
-			return $(display_error "can not find a go version match $mod_ver") 
-		fi
+	# Prefer an already-installed match; otherwise resolve the latest available patch.
+	version="$(__gvm_map_version_hint_to_tag "${hint}" installed)" || version=""
+	if [[ -z "${version}" ]]; then
+		version="$(__gvm_map_version_hint_to_tag "${hint}" available)" || version=""
+	fi
+	[[ -n "${version}" ]] || return $(display_error "can not find a go version match ${hint}")
 
-		display_message "$mod_ver does not exist, try to install..."
-		$GVM_ROOT/scripts/install $mod_ver
+	display_message "go.mod requests ${hint}; using ${version}"
 
-		if [ $? -ne 0 ]; then
-			return $(display_error "gvm install $mod_ver error")
+	if [[ ! -d "${GVM_ROOT}/gos/${version}" ]]; then
+		display_message "${version} does not exist, try to install..."
+		"$GVM_ROOT/scripts/install" "${version}"
+		if [[ $? -ne 0 ]]; then
+			return $(display_error "gvm install ${version} error")
 		fi
 	fi
 
-	gvm_use "$mod_ver"
-
+	gvm_use "${version}"
 }
